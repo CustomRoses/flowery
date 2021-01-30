@@ -1,0 +1,11 @@
+package Flowery;
+
+import discord4j.core.event.domain.message.MessageCreateEvent;
+
+public class Interfaces {
+	interface Command {
+		void execute(MessageCreateEvent event);
+	}
+	
+	
+}
