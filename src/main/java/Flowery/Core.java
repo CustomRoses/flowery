@@ -2,6 +2,7 @@ package Flowery;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -58,13 +59,15 @@ public class Core {
 				// to be done, but instead of blocking the thread, waiting for it
 				// to finish, it will just execute the results asynchronously.
 				.subscribe(event -> {
-					final String content = event.getMessage().getContent();
 
-					for (final Map.Entry<String, Command> entry : commands.entrySet()) {
-						// We will be using as our "prefix" to any command in the system.
-						if (content.startsWith('¬' + entry.getKey())) {
-							entry.getValue().execute(event);
-							break;
+					final String content = event.getMessage().getContent();
+					if (!event.getMessage().getAuthorAsMember().block().isBot()) {
+						for (final Map.Entry<String, Command> entry : commands.entrySet()) {
+							// We will be using as our "prefix" to any command in the system.
+							if (content.startsWith('¬' + entry.getKey())) {
+								entry.getValue().execute(event);
+								break;
+							}
 						}
 					}
 				});
@@ -73,34 +76,43 @@ public class Core {
 			final VoiceState voiceState = member.getVoiceState().block();
 			Set<Snowflake> kickees = event.getMessage().getUserMentionIds();
 			kickees.forEach(user -> {
-					voiceState.getChannel().block().getVoiceStates().subscribe(target -> {
-						if(user == target.getUserId()) {
-							target.getMember().block().kick().block();
-							System.out.println("Kicked Someone");
-						}
-							
-					});
+				voiceState.getChannel().block().getVoiceStates().subscribe(target -> {
+					if (user == target.getUserId()) {
+						target.getMember().block().kick().block();
+						System.out.println("Kicked Someone");
+					}
+
+				});
 			});
-			
+
 		});
-		
-		
+
 		// Simple Ping Command to check if the bot is live
-		commands.put("ping",
-				event -> event.getMessage().getChannel().block().createMessage("<:pinged:747783377322508290>").block());
+		commands.put("ping", event -> {
+			event.getMessage().getChannel().block().createMessage("<:pinged:747783377322508290>").block();
+		});
 
 		commands.put("info", event -> {
 			MessageChannel channel = event.getMessage().getChannel().block();
 			channel.createEmbed(spec -> {
-				spec.addField("Author", "CustomRoses", true).addField("Version", "0.0.1", true).addField("Framework", "Discord4J", true).setTitle("info").setAuthor("Flowery", "http://pixelartmaker.com/art/8a60641ddf930e4.png", "http://pixelartmaker.com/art/8a60641ddf930e4.png");
+				spec.addField("Author", "CustomRoses", true).addField("Version", "0.0.1", true)
+						.addField("Framework", "Discord4J", true).setTitle("info").setAuthor("Flowery",
+								"http://pixelartmaker.com/art/8a60641ddf930e4.png",
+								"http://pixelartmaker.com/art/8a60641ddf930e4.png");
 			}).block();
 		});
-		
+
 		commands.put("help", event -> {
 			MessageChannel channel = event.getMessage().getChannel().block();
 			channel.createEmbed(spec -> {
-				spec.addField("ping", "tests if the bot is online", false).addField("join", "joins your current voice channel. Prerequisite for play and leave", false).addField("leave", "Disconnects from the current voice channel", false).addField("play", "Adds a provided youtube URL to the queue", false)
-				.addField("mhm", "mhm.", false).setAuthor("Flowery", "http://pixelartmaker.com/art/8a60641ddf930e4.png", "http://pixelartmaker.com/art/8a60641ddf930e4.png").setTitle("Use prefix \"¬\"");
+				spec.addField("ping", "tests if the bot is online", false)
+						.addField("join", "joins your current voice channel. Prerequisite for play and leave", false)
+						.addField("leave", "Disconnects from the current voice channel", false)
+						.addField("play", "Adds a provided youtube URL to the queue", false)
+						.addField("mhm", "mhm.", false)
+						.setAuthor("Flowery", "http://pixelartmaker.com/art/8a60641ddf930e4.png",
+								"http://pixelartmaker.com/art/8a60641ddf930e4.png")
+						.setTitle("Use prefix \"¬\"");
 			}).block();
 		});
 
@@ -118,11 +130,15 @@ public class Core {
 					final VoiceChannel channel = voiceState.getChannel().block();
 					if (channel != null) {
 						VoiceConnection connection = channel.join(spec -> spec.setProvider(provider)).block();
-						event.getMessage().getChannel().block().createMessage("Joined " + member.getDisplayName() + " in " + member.getVoiceState().block().getChannel().block().getName()).block();
+						event.getMessage().getChannel().block().createMessage("Joined " + member.getDisplayName()
+								+ " in " + member.getVoiceState().block().getChannel().block().getName()).block();
 						System.out.println("Joined a channel!");
 						client.getEventDispatcher().on(MessageCreateEvent.class).subscribe(thing -> {
 							if (thing.getMessage().getContent().equals("¬leave")) {
-								thing.getMessage().getChannel().block().createMessage("Disconnecting from " + member.getVoiceState().block().getChannel().block().getName()).block();
+								thing.getMessage().getChannel().block()
+										.createMessage("Disconnecting from "
+												+ member.getVoiceState().block().getChannel().block().getName())
+										.block();
 								connection.disconnect().block();
 								client.getEventDispatcher().shutdown();
 								main(args);
@@ -133,7 +149,6 @@ public class Core {
 								event.getClient().logout().block();
 								System.out.println("shutting down");
 							}
-							
 
 						});
 					}
@@ -145,10 +160,16 @@ public class Core {
 		// Play Music Command
 		final TrackScheduler scheduler = new TrackScheduler(player);
 		commands.put("play", event -> {
-			event.getMessage().getChannel().block().createMessage("Added to the queue").block();
+
 			final String content = event.getMessage().getContent();
 			final List<String> command = Arrays.asList(content.split(" "));
-			playerManager.loadItem(command.get(1), scheduler);
+			if (command.get(1).contains("youtu.be") || command.get(1).contains("youtube")) {
+				playerManager.loadItem(command.get(1), scheduler);
+				event.getMessage().getChannel().block().createMessage("Added to the queue").block();
+			} else {
+				event.getMessage().getChannel().block().createMessage(command.get(1) + " is not a valid URL").block();
+			}
+
 		});
 
 		client.onDisconnect().block();
